@@ -1,0 +1,12 @@
+{
+  "channels": [],
+  "directMessages": [],
+  "users": [],
+  "admin": {
+    "password": "admin123",
+    "customUsername": null,
+    "isLoggedIn": false
+  },
+  "announcements": []
+}
+
