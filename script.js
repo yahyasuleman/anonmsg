@@ -42,6 +42,10 @@ function getOrAssignAnonymousUsername() {
 // Set the username when page loads
 function initializeUsername() {
     const usernameElement = document.getElementById('username');
+    if (!usernameElement) {
+        console.warn('Username element not found');
+        return;
+    }
     const username = getUsername();
     usernameElement.textContent = username;
 }
@@ -284,6 +288,8 @@ function showModal(modalId) {
     const modal = document.getElementById(modalId);
     if (modal) {
         modal.classList.add('show');
+    } else {
+        console.error('Modal not found:', modalId);
     }
 }
 
@@ -291,6 +297,8 @@ function hideModal(modalId) {
     const modal = document.getElementById(modalId);
     if (modal) {
         modal.classList.remove('show');
+    } else {
+        console.error('Modal not found:', modalId);
     }
 }
 
@@ -433,8 +441,17 @@ function renderConversations() {
 
     // Initialize on page load
 document.addEventListener('DOMContentLoaded', function() {
-    initializeUsername();
-    initializeAdminPassword();
+    try {
+        initializeUsername();
+    } catch (e) {
+        console.error('Error initializing username:', e);
+    }
+    
+    try {
+        initializeAdminPassword();
+    } catch (e) {
+        console.error('Error initializing admin password:', e);
+    }
 
     // Button event listeners
     const createChannelBtn = document.getElementById('createChannelBtn');
@@ -449,117 +466,165 @@ document.addEventListener('DOMContentLoaded', function() {
     const backToMainBtn = document.getElementById('backToMainBtn');
 
     // Create Channel
-    createChannelBtn.addEventListener('click', () => {
-        showModal('createChannelModal');
-    });
+    if (createChannelBtn) {
+        createChannelBtn.addEventListener('click', () => {
+            showModal('createChannelModal');
+        });
+    } else {
+        console.error('createChannelBtn not found');
+    }
 
-    closeCreateModal.addEventListener('click', () => {
-        hideModal('createChannelModal');
-    });
+    if (closeCreateModal) {
+        closeCreateModal.addEventListener('click', () => {
+            hideModal('createChannelModal');
+        });
+    }
 
-    cancelCreateBtn.addEventListener('click', () => {
-        hideModal('createChannelModal');
-    });
+    if (cancelCreateBtn) {
+        cancelCreateBtn.addEventListener('click', () => {
+            hideModal('createChannelModal');
+        });
+    }
 
-    document.getElementById('createChannelForm').addEventListener('submit', (e) => {
-        e.preventDefault();
-        const name = document.getElementById('channelName').value.trim();
-        const type = document.querySelector('input[name="channelType"]:checked').value;
-        const hasPassword = document.getElementById('hasPassword').checked;
-        const password = hasPassword ? document.getElementById('channelPassword').value.trim() : null;
-        
-        if (!name) {
-            alert('Please enter a channel name');
-            return;
-        }
-        
-        if (hasPassword && !password) {
-            alert('Please enter a password');
-            return;
-        }
-        
-        const channel = createChannel(name, type, password);
-        hideModal('createChannelModal');
-        document.getElementById('createChannelForm').reset();
-        document.getElementById('passwordGroup').style.display = 'none';
-        alert(`Channel "${name}" created successfully!`);
-    });
+    const createChannelForm = document.getElementById('createChannelForm');
+    if (createChannelForm) {
+        createChannelForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const name = document.getElementById('channelName')?.value.trim();
+            const type = document.querySelector('input[name="channelType"]:checked')?.value;
+            const hasPassword = document.getElementById('hasPassword')?.checked;
+            const password = hasPassword ? document.getElementById('channelPassword')?.value.trim() : null;
+            
+            if (!name) {
+                alert('Please enter a channel name');
+                return;
+            }
+            
+            if (hasPassword && !password) {
+                alert('Please enter a password');
+                return;
+            }
+            
+            const channel = createChannel(name, type, password);
+            hideModal('createChannelModal');
+            const form = document.getElementById('createChannelForm');
+            if (form) form.reset();
+            const passwordGroup = document.getElementById('passwordGroup');
+            if (passwordGroup) passwordGroup.style.display = 'none';
+            alert(`Channel "${name}" created successfully!`);
+        });
+    }
 
     // Toggle password field
-    document.getElementById('hasPassword').addEventListener('change', (e) => {
-        const passwordGroup = document.getElementById('passwordGroup');
-        passwordGroup.style.display = e.target.checked ? 'block' : 'none';
-    });
+    const hasPasswordCheckbox = document.getElementById('hasPassword');
+    if (hasPasswordCheckbox) {
+        hasPasswordCheckbox.addEventListener('change', (e) => {
+            const passwordGroup = document.getElementById('passwordGroup');
+            if (passwordGroup) {
+                passwordGroup.style.display = e.target.checked ? 'block' : 'none';
+            }
+        });
+    }
 
     // Join Channel
-    joinChannelBtn.addEventListener('click', () => {
-        renderPublicChannels();
-        showModal('joinChannelModal');
-    });
+    if (joinChannelBtn) {
+        joinChannelBtn.addEventListener('click', () => {
+            renderPublicChannels();
+            showModal('joinChannelModal');
+        });
+    } else {
+        console.error('joinChannelBtn not found');
+    }
 
-    closeJoinModal.addEventListener('click', () => {
-        hideModal('joinChannelModal');
-    });
-
-    document.getElementById('joinPrivateForm').addEventListener('submit', (e) => {
-        e.preventDefault();
-        const channelName = document.getElementById('privateChannelName').value.trim();
-        const password = document.getElementById('privateChannelPassword').value.trim();
-        
-        if (!channelName || !password) {
-            alert('Please enter both channel name and password');
-            return;
-        }
-        
-        const result = joinPrivateChannelByName(channelName, password);
-        if (result.success) {
+    if (closeJoinModal) {
+        closeJoinModal.addEventListener('click', () => {
             hideModal('joinChannelModal');
-            document.getElementById('joinPrivateForm').reset();
-            showChatView(result.channel.id, result.channel.name, 'channel');
-        } else {
-            alert(result.message);
-        }
-    });
+        });
+    }
+
+    const joinPrivateForm = document.getElementById('joinPrivateForm');
+    if (joinPrivateForm) {
+        joinPrivateForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const channelName = document.getElementById('privateChannelName')?.value.trim();
+            const password = document.getElementById('privateChannelPassword')?.value.trim();
+            
+            if (!channelName || !password) {
+                alert('Please enter both channel name and password');
+                return;
+            }
+            
+            const result = joinPrivateChannelByName(channelName, password);
+            if (result.success) {
+                hideModal('joinChannelModal');
+                const form = document.getElementById('joinPrivateForm');
+                if (form) form.reset();
+                showChatView(result.channel.id, result.channel.name, 'channel');
+            } else {
+                alert(result.message);
+            }
+        });
+    }
 
     // DM
-    dmBtn.addEventListener('click', () => {
-        renderConversations();
-        showModal('dmModal');
-    });
+    if (dmBtn) {
+        dmBtn.addEventListener('click', () => {
+            renderConversations();
+            showModal('dmModal');
+        });
+    } else {
+        console.error('dmBtn not found');
+    }
 
-    closeDMModal.addEventListener('click', () => {
-        hideModal('dmModal');
-    });
+    if (closeDMModal) {
+        closeDMModal.addEventListener('click', () => {
+            hideModal('dmModal');
+        });
+    }
 
-    document.getElementById('startDMBtn').addEventListener('click', () => {
-        const targetUsername = document.getElementById('dmUsername').value.trim();
-        if (!targetUsername) {
-            alert('Please enter a username');
-            return;
-        }
-        
-        if (targetUsername === getUsername()) {
-            alert('You cannot message yourself');
-            return;
-        }
-        
-        const conversation = startDM(targetUsername);
-        hideModal('dmModal');
-        document.getElementById('dmUsername').value = '';
-        showChatView(conversation.id, targetUsername, 'dm');
-    });
+    const startDMBtn = document.getElementById('startDMBtn');
+    if (startDMBtn) {
+        startDMBtn.addEventListener('click', () => {
+            const targetUsername = document.getElementById('dmUsername')?.value.trim();
+            if (!targetUsername) {
+                alert('Please enter a username');
+                return;
+            }
+            
+            if (targetUsername === getUsername()) {
+                alert('You cannot message yourself');
+                return;
+            }
+            
+            const conversation = startDM(targetUsername);
+            hideModal('dmModal');
+            const dmUsernameInput = document.getElementById('dmUsername');
+            if (dmUsernameInput) dmUsernameInput.value = '';
+            showChatView(conversation.id, targetUsername, 'dm');
+        });
+    }
 
     // Chat View
-    backToMainBtn.addEventListener('click', () => {
-        hideChatView();
-    });
+    if (backToMainBtn) {
+        backToMainBtn.addEventListener('click', () => {
+            hideChatView();
+        });
+    }
 
-    document.getElementById('sendMessageBtn').addEventListener('click', sendMessage);
-    document.getElementById('messageInput').addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') {
-            sendMessage();
-        }
-    });
+    const sendMessageBtn = document.getElementById('sendMessageBtn');
+    const messageInput = document.getElementById('messageInput');
+    
+    if (sendMessageBtn) {
+        sendMessageBtn.addEventListener('click', sendMessage);
+    }
+    
+    if (messageInput) {
+        messageInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+    }
 
     function sendMessage() {
         const input = document.getElementById('messageInput');
@@ -596,6 +661,13 @@ document.addEventListener('DOMContentLoaded', function() {
     const adminLoginForm = document.getElementById('adminLoginForm');
     const adminAnnouncesBtn = document.getElementById('adminAnnouncesBtn');
     const backFromAnnouncementsBtn = document.getElementById('backFromAnnouncementsBtn');
+    
+    if (!adminPanelBtn) {
+        console.error('adminPanelBtn not found');
+    }
+    if (!adminAnnouncesBtn) {
+        console.error('adminAnnouncesBtn not found');
+    }
 
     // Initialize admin password if not set - more robust for GitHub Pages
     function initializeAdminPassword() {
@@ -839,7 +911,10 @@ document.addEventListener('DOMContentLoaded', function() {
     // Update displayed username
     function updateDisplayedUsername() {
         const username = getUsername();
-        document.getElementById('username').textContent = username;
+        const usernameEl = document.getElementById('username');
+        if (usernameEl) {
+            usernameEl.textContent = username;
+        }
     }
 
     // Render admin dashboard
@@ -873,7 +948,8 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // Admin Panel Button
-    adminPanelBtn.addEventListener('click', () => {
+    if (adminPanelBtn) {
+        adminPanelBtn.addEventListener('click', () => {
         // Always initialize admin first
         initializeAdminPassword();
         const data = loadData();
@@ -894,14 +970,18 @@ document.addEventListener('DOMContentLoaded', function() {
             if (adminPasswordInput) adminPasswordInput.value = '';
         }
         showModal('adminPanelModal');
-    });
+        });
+    }
 
-    closeAdminModal.addEventListener('click', () => {
-        hideModal('adminPanelModal');
-    });
+    if (closeAdminModal) {
+        closeAdminModal.addEventListener('click', () => {
+            hideModal('adminPanelModal');
+        });
+    }
 
     // Admin login form
-    adminLoginForm.addEventListener('submit', (e) => {
+    if (adminLoginForm) {
+        adminLoginForm.addEventListener('submit', (e) => {
         e.preventDefault();
         const password = document.getElementById('adminPassword').value;
         
@@ -914,10 +994,13 @@ document.addEventListener('DOMContentLoaded', function() {
         } else {
             alert('Incorrect password');
         }
-    });
+        });
+    }
 
     // Set admin username
-    document.getElementById('setAdminUsernameBtn').addEventListener('click', () => {
+    const setAdminUsernameBtn = document.getElementById('setAdminUsernameBtn');
+    if (setAdminUsernameBtn) {
+        setAdminUsernameBtn.addEventListener('click', () => {
         const username = document.getElementById('adminCustomUsername').value.trim();
         if (!username) {
             alert('Please enter a username');
@@ -931,10 +1014,13 @@ document.addEventListener('DOMContentLoaded', function() {
         } else {
             alert('You must be logged in as admin');
         }
-    });
+        });
+    }
 
     // Change admin password
-    document.getElementById('changeAdminPasswordBtn').addEventListener('click', () => {
+    const changeAdminPasswordBtn = document.getElementById('changeAdminPasswordBtn');
+    if (changeAdminPasswordBtn) {
+        changeAdminPasswordBtn.addEventListener('click', () => {
         const newPassword = document.getElementById('newAdminPassword').value.trim();
         const confirmPassword = document.getElementById('confirmAdminPassword').value.trim();
         
@@ -946,10 +1032,13 @@ document.addEventListener('DOMContentLoaded', function() {
         } else {
             alert(result.message);
         }
-    });
+        });
+    }
 
     // Admin join channel
-    document.getElementById('adminJoinChannelBtn').addEventListener('click', () => {
+    const adminJoinChannelBtn = document.getElementById('adminJoinChannelBtn');
+    if (adminJoinChannelBtn) {
+        adminJoinChannelBtn.addEventListener('click', () => {
         const channelId = document.getElementById('adminChannelSelect').value;
         if (!channelId) {
             alert('Please select a channel');
@@ -963,10 +1052,13 @@ document.addEventListener('DOMContentLoaded', function() {
         } else {
             alert(result.message);
         }
-    });
+        });
+    }
 
     // Create announcement
-    document.getElementById('createAnnouncementForm').addEventListener('submit', (e) => {
+    const createAnnouncementForm = document.getElementById('createAnnouncementForm');
+    if (createAnnouncementForm) {
+        createAnnouncementForm.addEventListener('submit', (e) => {
         e.preventDefault();
         const title = document.getElementById('announcementTitle').value.trim();
         const message = document.getElementById('announcementMessage').value.trim();
@@ -985,15 +1077,20 @@ document.addEventListener('DOMContentLoaded', function() {
         } else {
             alert(result.message);
         }
-    });
+        });
+    }
 
     // Admin Announces button
-    adminAnnouncesBtn.addEventListener('click', () => {
-        showAnnouncementsView();
-    });
+    if (adminAnnouncesBtn) {
+        adminAnnouncesBtn.addEventListener('click', () => {
+            showAnnouncementsView();
+        });
+    }
 
     // Back from announcements
-    backFromAnnouncementsBtn.addEventListener('click', () => {
-        hideAnnouncementsView();
-    });
+    if (backFromAnnouncementsBtn) {
+        backFromAnnouncementsBtn.addEventListener('click', () => {
+            hideAnnouncementsView();
+        });
+    }
 });
