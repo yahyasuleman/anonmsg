@@ -59,14 +59,39 @@ function getUsername() {
 // Data Storage Functions
 function loadData() {
     try {
+        // Check if localStorage is available (important for GitHub Pages)
+        if (typeof(Storage) === "undefined" || !window.localStorage) {
+            console.warn('localStorage is not available');
+            return getDefaultData();
+        }
+        
         const data = localStorage.getItem('messengerData');
         if (data) {
-            return JSON.parse(data);
+            const parsed = JSON.parse(data);
+            // Ensure admin object exists
+            if (!parsed.admin) {
+                parsed.admin = {
+                    password: 'admin123',
+                    customUsername: null,
+                    isLoggedIn: false
+                };
+            }
+            return parsed;
         }
     } catch (e) {
         console.error('Error loading data:', e);
+        // If there's corrupted data, return default
+        try {
+            localStorage.removeItem('messengerData');
+        } catch (e2) {
+            console.error('Error clearing corrupted data:', e2);
+        }
     }
     // Return default structure if no data exists
+    return getDefaultData();
+}
+
+function getDefaultData() {
     return {
         channels: [],
         directMessages: [],
@@ -82,11 +107,40 @@ function loadData() {
 
 function saveData(data) {
     try {
+        // Check if localStorage is available
+        if (typeof(Storage) === "undefined" || !window.localStorage) {
+            console.warn('localStorage is not available, cannot save data');
+            return false;
+        }
+        
+        // Ensure admin object exists before saving
+        if (!data.admin) {
+            data.admin = {
+                password: 'admin123',
+                customUsername: null,
+                isLoggedIn: false
+            };
+        }
+        
         localStorage.setItem('messengerData', JSON.stringify(data));
-        // Also update data.json file structure (for reference)
         return true;
     } catch (e) {
         console.error('Error saving data:', e);
+        // If quota exceeded, try to clear old data
+        if (e.name === 'QuotaExceededError') {
+            console.warn('localStorage quota exceeded, attempting to clear old data');
+            try {
+                // Keep only admin and announcements, clear old messages
+                data.channels = data.channels.map(ch => ({
+                    ...ch,
+                    messages: ch.messages.slice(-50) // Keep only last 50 messages
+                }));
+                localStorage.setItem('messengerData', JSON.stringify(data));
+                return true;
+            } catch (e2) {
+                console.error('Error after cleanup:', e2);
+            }
+        }
         return false;
     }
 }
@@ -543,45 +597,67 @@ document.addEventListener('DOMContentLoaded', function() {
     const adminAnnouncesBtn = document.getElementById('adminAnnouncesBtn');
     const backFromAnnouncementsBtn = document.getElementById('backFromAnnouncementsBtn');
 
-    // Initialize admin password if not set
+    // Initialize admin password if not set - more robust for GitHub Pages
     function initializeAdminPassword() {
         const data = loadData();
-        if (!data.admin || !data.admin.password) {
-            if (!data.admin) {
-                data.admin = {};
-            }
-            data.admin.password = 'admin123';
-            data.admin.customUsername = null;
-            data.admin.isLoggedIn = false;
+        // Always ensure admin object exists with all required properties
+        if (!data.admin) {
+            data.admin = {
+                password: 'admin123',
+                customUsername: null,
+                isLoggedIn: false
+            };
             saveData(data);
+            return;
+        }
+        
+        // If admin exists but password is missing or invalid, reset it
+        if (!data.admin.password || typeof data.admin.password !== 'string') {
+            data.admin.password = 'admin123';
+            // Don't reset customUsername or isLoggedIn if they exist
+            if (data.admin.customUsername === undefined) {
+                data.admin.customUsername = null;
+            }
+            if (data.admin.isLoggedIn === undefined) {
+                data.admin.isLoggedIn = false;
+            }
+            saveData(data);
+            return;
         }
     }
 
-    // Admin login
+    // Admin login - more robust checking
     function loginAdmin(password) {
+        // Always ensure admin is initialized first
+        initializeAdminPassword();
+        
         const data = loadData();
-        // Initialize if not set
+        
+        // Ensure we have valid admin data
         if (!data.admin || !data.admin.password) {
-            initializeAdminPassword();
-            // Reload data after initialization
-            const updatedData = loadData();
-            if (updatedData.admin && updatedData.admin.password === password) {
-                updatedData.admin.isLoggedIn = true;
-                saveData(updatedData);
-                return true;
-            }
-            return false;
+            console.error('Admin data not properly initialized');
+            // Force re-initialization
+            data.admin = {
+                password: 'admin123',
+                customUsername: data.admin?.customUsername || null,
+                isLoggedIn: false
+            };
+            saveData(data);
         }
-        if (data.admin && data.admin.password === password) {
+        
+        // Check password
+        if (data.admin && data.admin.password && data.admin.password === password) {
             data.admin.isLoggedIn = true;
             saveData(data);
             return true;
         }
+        
         return false;
     }
 
     // Change admin password
     function changeAdminPassword(newPassword, confirmPassword) {
+        initializeAdminPassword(); // Ensure admin exists
         const data = loadData();
         if (!isAdminLoggedIn()) {
             return { success: false, message: 'You must be logged in as admin' };
@@ -602,6 +678,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Check if admin is logged in
     function isAdminLoggedIn() {
+        initializeAdminPassword(); // Ensure admin exists
         const data = loadData();
         return data.admin && data.admin.isLoggedIn === true;
     }
@@ -617,12 +694,16 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Set admin custom username
     function setAdminCustomUsername(username) {
+        initializeAdminPassword(); // Ensure admin exists
         const data = loadData();
         if (data.admin && data.admin.isLoggedIn) {
             data.admin.customUsername = username;
             saveData(data);
             // Update displayed username
-            document.getElementById('username').textContent = username;
+            const usernameEl = document.getElementById('username');
+            if (usernameEl) {
+                usernameEl.textContent = username;
+            }
             return true;
         }
         return false;
@@ -636,6 +717,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Admin join any channel (bypasses password)
     function adminJoinChannel(channelId) {
+        initializeAdminPassword(); // Ensure admin exists
         const data = loadData();
         if (!isAdminLoggedIn()) {
             return { success: false, message: 'Not logged in as admin' };
@@ -657,6 +739,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Create announcement
     function createAnnouncement(title, message, imageUrl, videoUrl) {
+        initializeAdminPassword(); // Ensure admin exists
         const data = loadData();
         if (!isAdminLoggedIn()) {
             return { success: false, message: 'Not logged in as admin' };
@@ -761,41 +844,54 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Render admin dashboard
     function renderAdminDashboard() {
+        initializeAdminPassword(); // Ensure admin exists
         const data = loadData();
         
         // Show current username
         const currentUsername = getUsername();
-        document.getElementById('currentAdminUsername').textContent = currentUsername;
+        const adminUsernameEl = document.getElementById('currentAdminUsername');
+        if (adminUsernameEl) {
+            adminUsernameEl.textContent = currentUsername;
+        }
         
         // Update main page username display
         updateDisplayedUsername();
         
         // Populate channel select
         const channelSelect = document.getElementById('adminChannelSelect');
-        channelSelect.innerHTML = '<option value="">-- Select a channel --</option>';
-        
-        const allChannels = getAllChannels();
-        allChannels.forEach(channel => {
-            const option = document.createElement('option');
-            option.value = channel.id;
-            option.textContent = `${channel.name} (${channel.type}) - ${channel.members.length} members`;
-            channelSelect.appendChild(option);
-        });
+        if (channelSelect) {
+            channelSelect.innerHTML = '<option value="">-- Select a channel --</option>';
+            
+            const allChannels = getAllChannels();
+            allChannels.forEach(channel => {
+                const option = document.createElement('option');
+                option.value = channel.id;
+                option.textContent = `${channel.name} (${channel.type}) - ${channel.members.length} members`;
+                channelSelect.appendChild(option);
+            });
+        }
     }
 
     // Admin Panel Button
     adminPanelBtn.addEventListener('click', () => {
+        // Always initialize admin first
+        initializeAdminPassword();
         const data = loadData();
-        if (data.admin && data.admin.isLoggedIn) {
+        
+        const adminLoginView = document.getElementById('adminLoginView');
+        const adminDashboard = document.getElementById('adminDashboard');
+        const adminPasswordInput = document.getElementById('adminPassword');
+        
+        if (data.admin && data.admin.isLoggedIn === true) {
             // Already logged in, show dashboard
-            document.getElementById('adminLoginView').classList.add('hidden');
-            document.getElementById('adminDashboard').classList.remove('hidden');
+            if (adminLoginView) adminLoginView.classList.add('hidden');
+            if (adminDashboard) adminDashboard.classList.remove('hidden');
             renderAdminDashboard();
         } else {
             // Show login
-            document.getElementById('adminLoginView').classList.remove('hidden');
-            document.getElementById('adminDashboard').classList.add('hidden');
-            document.getElementById('adminPassword').value = '';
+            if (adminLoginView) adminLoginView.classList.remove('hidden');
+            if (adminDashboard) adminDashboard.classList.add('hidden');
+            if (adminPasswordInput) adminPasswordInput.value = '';
         }
         showModal('adminPanelModal');
     });
